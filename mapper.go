@@ -1,4 +1,4 @@
-package jet
+package pogo
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 )
 
 type mapper struct {
-	conv ColumnConverter
 }
 
 func (m *mapper) unpack(keys []string, values []interface{}, out interface{}) error {
@@ -21,20 +20,20 @@ func (m *mapper) unpack(keys []string, values []interface{}, out interface{}) er
 }
 
 func (m *mapper) unpackValue(keys []string, values []interface{}, out reflect.Value) error {
-	switch out.Interface().(type) {
-	case ComplexValue:
-		if out.IsNil() {
-			out.Set(reflect.New(out.Type().Elem()))
-		}
-		plain := reflect.Indirect(reflect.ValueOf(values[0]))
-		return out.Interface().(ComplexValue).Decode(plain.Interface())
-	}
-	if out.CanAddr() {
-		switch out.Addr().Interface().(type) {
-		case ComplexValue:
-			return m.unpackValue(keys, values, out.Addr())
-		}
-	}
+	// switch out.Interface().(type) {
+	// case ComplexValue:
+	// 	if out.IsNil() {
+	// 		out.Set(reflect.New(out.Type().Elem()))
+	// 	}
+	// 	plain := reflect.Indirect(reflect.ValueOf(values[0]))
+	// 	return out.Interface().(ComplexValue).Decode(plain.Interface())
+	// }
+	// if out.CanAddr() {
+	// 	switch out.Addr().Interface().(type) {
+	// 	case ComplexValue:
+	// 		return m.unpackValue(keys, values, out.Addr())
+	// 	}
+	// }
 	switch out.Kind() {
 	case reflect.Ptr:
 		if out.IsNil() {
@@ -75,12 +74,7 @@ func (m *mapper) unpackStruct(keys []string, values []interface{}, out reflect.V
 		return m.unpackSimple(nil, values, out)
 	}
 	for i, k := range keys {
-		var convKey string
-		if m.conv == nil {
-			convKey = strings.ToUpper(k[:1]) + k[1:]
-		} else if m.conv != nil {
-			convKey = m.conv.ColumnToFieldName(k)
-		}
+		convKey := ColumnToFieldName(k)
 		field := out.FieldByName(convKey)
 		if field.IsValid() {
 			m.unpackValue(nil, values[i:i+1], field)
@@ -158,8 +152,8 @@ func setValueFromBytes(t []uint8, to reflect.Value) {
 		convertAndSet(n, to)
 	case string:
 		to.SetString(string(t))
-	case map[string]interface{}:
-		to.Set(reflect.ValueOf(parseHstoreColumn(string(t))))
+	// case map[string]interface{}:
+	// 	to.Set(reflect.ValueOf(parseHstoreColumn(string(t))))
 	default:
 		convertAndSet(t, to)
 	}
@@ -201,4 +195,16 @@ func setValueFromTime(t time.Time, to reflect.Value) {
 	default:
 		convertAndSet(t, to)
 	}
+}
+
+func ColumnToFieldName(col string) string {
+	name := ""
+	if l := len(col); l > 0 {
+		chunks := strings.Split(col, "_")
+		for i, v := range chunks {
+			chunks[i] = strings.Title(v)
+		}
+		name = strings.Join(chunks, "")
+	}
+	return name
 }
